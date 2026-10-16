@@ -38,3 +38,7 @@ server/uploads/*
 *.sw?
 
 .vite
+
+.env
+server/.env
+*.env
