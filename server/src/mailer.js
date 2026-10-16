@@ -1,36 +1,30 @@
-import nodemailer from "nodemailer";
 
-const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
-const isConfigured = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+import { Resend } from "resend";
 
-let transporter = null;
-if (isConfigured) {
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT || 587),
-    secure: Number(SMTP_PORT) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-}
+const { RESEND_API_KEY, SMTP_FROM } = process.env;
 
-/**
- * Sends an email if SMTP is configured (e.g. a free Gmail app password —
- * see server/.env.example). Otherwise just logs to the console so local
- * dev/testing still works without any paid service.
- */
+const resend = RESEND_API_KEY
+  ? new Resend(RESEND_API_KEY)
+  : null;
+
 export async function sendMail({ to, subject, text }) {
-  if (!isConfigured) {
-    console.log(`\n--- [DEV EMAIL — no SMTP configured] ---\nTo: ${to}\nSubject: ${subject}\n\n${text}\n-----------------------------------------\n`);
-    return { delivered: false };
+  if (!resend) {
+    throw new Error("Email service is not configured");
   }
 
-  await transporter.sendMail({
-    from: SMTP_FROM || SMTP_USER,
-    to,
+  const { data, error } = await resend.emails.send({
+    from: SMTP_FROM || "Eventneve <onboarding@resend.dev>",
+    to: [to],
     subject,
     text,
   });
-  return { delivered: true };
+
+  if (error) {
+    console.error("Email delivery failed:", error);
+    throw new Error("Unable to send email");
+  }
+
+  return { delivered: true, id: data.id };
 }
 
-export const emailConfigured = isConfigured;
+export const emailConfigured = Boolean(resend);
